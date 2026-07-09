@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Itinerary Builder</title>
+    <style>
+        /* CSS Variables for Light/Dark Mode */
+        :root {
+            /* Light Mode Defaults */
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --border-color: #e2e8f0;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --accent: #6366f1;
+            --accent-hover: #4f46e5;
+            --success: #10b981;
+            --success-hover: #059669;
+        }
+
+        [data-theme="dark"] {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --border-color: #334155;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        header {
+            background-color: var(--card-bg);
+            border-bottom: 1px solid var(--border-color);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 10;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 1rem;
+        }
+
+        h1 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            letter-spacing: -0.025em;
+        }
+
+        .btn {
+            background-color: var(--accent);
+            color: white;
+            border: none;
+            padding: 0.625rem 1.25rem;
+            border-radius: 0.375rem;
+            cursor: pointer;
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: background-color 0.2s, transform 0.1s;
+        }
+
+        .btn:hover { background-color: var(--accent-hover); }
+        .btn:active { transform: scale(0.98); }
+
+        .btn-secondary {
+            background-color: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+        }
+
+        .btn-secondary:hover {
+            background-color: var(--border-color);
+        }
+
+        .btn-success {
+            background-color: var(--success);
+            font-size: 1rem;
+            padding: 0.875rem 2rem;
+        }
+
+        .btn-success:hover { background-color: var(--success-hover); }
+
+        /* Screen Routing System */
+        .main-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: none;
+            flex-direction: column;
+            animation: fadeIn 0.4s ease-out forwards;
+        }
+
+        .screen.active {
+            display: flex;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Screen 1: Home Input */
+        .home-screen {
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 2rem;
+        }
+
+        .home-screen h2 {
+            font-size: 2.5rem;
+            margin-bottom: 2rem;
+            font-weight: 800;
+        }
+
+        .search-container {
+            display: flex;
+            gap: 0.5rem;
+            width: 100%;
+            max-width: 600px;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            background-color: var(--card-bg);
+            border: 2px solid var(--border-color);
+            color: var(--text-main);
+            padding: 1rem 1.5rem;
+            border-radius: 0.5rem;
+            font-size: 1.125rem;
+            transition: border-color 0.2s;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        /* Loading Screens */
+        .loading-screen {
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+
+        .loading-screen h2 {
+            font-size: 1.5rem;
+            margin-bottom: 2rem;
+            color: var(--text-main);
+        }
+
+        .progress-container {
+            width: 350px;
+            height: 6px;
+            background-color: var(--border-color);
+            border-radius: 3px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .progress-bar {
+            position: absolute;
+            height: 100%;
+            width: 40%;
+            background-color: var(--accent);
+            border-radius: 3px;
+            animation: slide 1.5s infinite ease-in-out;
+        }
+
+        @keyframes slide {
+            0% { left: -40%; }
+            100% { left: 100%; }
+        }
+
+        /* Screen 3: Selection Grid */
+        .selection-screen {
+            padding: 2rem;
+            max-width: 1000px;
+            margin: 0 auto;
+            width: 100%;
+            overflow-y: auto;
+        }
+
+        .selection-screen h2 {
+            font-size: 2rem;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+
+        .attractions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 3rem;
+        }
+
+        .attraction-card {
+            background-color: var(--card-bg);
+            border: 2px solid var(--border-color);
+            border-radius: 0.75rem;
+            padding: 1.25rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .attraction-card:hover {
+            border-color: var(--text-muted);
+            transform: translateY(-2px);
+        }
+
+        .attraction-card.selected {
+            border-color: var(--accent);
+            background-color: rgba(99, 102, 241, 0.08);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 0.5rem;
+        }
+
+        .attraction-card h3 {
+            font-size: 1.125rem;
+            margin-right: 1rem;
+        }
+
+        .attraction-card input[type="checkbox"] {
+            transform: scale(1.3);
+            cursor: pointer;
+            pointer-events: none; /* Let the card handle the click */
+        }
+
+        .attraction-card p {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+            margin-bottom: 1rem;
+        }
+
+        .badge {
+            font-size: 0.75rem;
+            background-color: var(--border-color);
+            padding: 0.25rem 0.625rem;
+            border-radius: 1rem;
+            font-weight: 500;
+        }
+
+        .action-bar {
+            display: flex;
+            justify-content: center;
+            padding-bottom: 2rem;
+        }
+
+        /* Screen 4: Final Split Layout */
+        .final-screen {
+            flex-direction: row !important;
+        }
+
+        .final-left {
+            width: 35%;
+            min-width: 300px;
+            border-right: 1px solid var(--border-color);
+            background-color: var(--card-bg);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .final-right {
+            flex: 1;
+            background-color: var(--bg-color);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel-header {
+            padding: 1.25rem;
+            border-bottom: 1px solid var(--border-color);
+            font-weight: 600;
+            font-size: 1.125rem;
+            background-color: var(--card-bg);
+        }
+
+        .panel-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.5rem;
+        }
+
+        /* Selected Events List in Left Panel */
+        .selected-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .selected-item {
+            background-color: var(--bg-color);
+            border: 1px solid var(--border-color);
+            padding: 1rem;
+            border-radius: 0.5rem;
+        }
+
+        .selected-item h4 {
+            font-size: 0.95rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .selected-item p {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .chat-dock {
+            padding: 1.25rem;
+            background-color: var(--card-bg);
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .chat-dock input {
+            padding: 0.75rem 1rem;
+            font-size: 0.95rem;
+        }
+
+        .itinerary-output {
+            font-size: 1.05rem;
+            line-height: 1.7;
+            white-space: pre-line;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .itinerary-output h3 {
+            margin-top: 2rem;
+            margin-bottom: 1rem;
+            color: var(--accent);
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 0.5rem;
+            font-size: 1.5rem;
+        }
+
+        .itinerary-output strong {
+            color: var(--text-main);
+        }
+
+        /* Modal styling */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0, 0, 0, 0.75);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+
+        .modal {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            padding: 2.5rem;
+            border-radius: 1rem;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+
+        .modal h2 { margin-bottom: 1rem; font-size: 1.5rem; }
+        .modal p { font-size: 0.95rem; color: var(--text-muted); margin-bottom: 1.5rem; line-height: 1.5; }
+        .modal-actions { display: flex; justify-content: flex-end; gap: 1rem; margin-top: 2rem; }
+        .hidden { display: none !important; }
+
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>🧭 AI Itinerary Optimizer</h1>
+        <div class="header-actions">
+            <button class="btn btn-secondary" onclick="toggleTheme()" id="theme-btn">🌙 Dark Mode</button>
+            <button class="btn btn-secondary" onclick="openKeyModal()">⚙️ API Key</button>
+        </div>
+    </header>
+
+    <div class="main-container">
+
+        <!-- SCREEN 1: Home Input -->
+        <div id="screen-home" class="screen home-screen active">
+            <h2>Where would you like to go?</h2>
+            <div class="search-container">
+                <input type="text" id="destination-input" placeholder="e.g. Kyoto, Paris, New York..." onkeypress="handleEnter(event, fetchAttractions)">
+                <button class="btn" onclick="fetchAttractions()" style="font-size: 1.1rem; padding: 0 2rem;">Let's Go</button>
+            </div>
+        </div>
+
+        <!-- SCREEN 2: Loading Attractions -->
+        <div id="screen-loading-1" class="screen loading-screen">
+            <h2>📍 Generating attractions and events for your visit...</h2>
+            <div class="progress-container">
+                <div class="progress-bar"></div>
+            </div>
+        </div>
+
+        <!-- SCREEN 3: Selection Grid -->
+        <div id="screen-select" class="screen selection-screen">
+            <h2>👀 What would you like to see?</h2>
+            <div class="attractions-grid" id="attractions-grid"></div>
+            <div class="action-bar">
+                <button class="btn btn-success" onclick="buildItinerary()">Generate My Itinerary</button>
+            </div>
+        </div>
+
+        <!-- SCREEN 4: Loading Itinerary -->
+        <div id="screen-loading-2" class="screen loading-screen">
+            <h2>📅 Generating your itinerary...</h2>
+            <div class="progress-container">
+                <div class="progress-bar"></div>
+            </div>
+        </div>
+
+        <!-- SCREEN 5: Final Split Layout -->
+        <div id="screen-final" class="screen final-screen">
+            <!-- Left Side: Selected Events & Chat -->
+            <div class="final-left">
+                <div class="panel-header">Selected Events</div>
+                <div class="panel-body">
+                    <div class="selected-list" id="selected-events-list"></div>
+                </div>
+                <div class="chat-dock">
+                    <input type="text" id="tweak-input" placeholder="Tweak it (e.g. 'Add coffee breaks')" onkeypress="handleEnter(event, tweakItinerary)">
+                    <button class="btn" onclick="tweakItinerary()">Update</button>
+                </div>
+            </div>
+
+            <!-- Right Side: The Itinerary Timeline -->
+            <div class="final-right">
+                <div class="panel-header" style="border-left: 1px solid var(--border-color);">Your Optimal Schedule</div>
+                <div class="panel-body" id="itinerary-output-container">
+                    <div class="itinerary-output" id="itinerary-output"></div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- API KEY MODAL -->
+    <div class="modal-overlay hidden" id="key-modal">
+        <div class="modal">
+            <h2>Configure Gemini API Key</h2>
+            <p>Your key is saved locally in your browser. The app makes direct requests to Google's API, ensuring zero server tracking.</p>
+            <input type="text" id="api-key-input" placeholder="AIzaSy..." style="width: 100%; margin-bottom: 1rem;">
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeKeyModal()">Close</button>
+                <button class="btn" onclick="saveApiKey()">Save Key</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let attractionsData = [];
+        let conversationHistory = [];
+        let selectedPlacesCache = [];
+
+        // --- Theme Management ---
+        function initTheme() {
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const savedTheme = localStorage.getItem('theme');
+            
+            if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
+                document.documentElement.setAttribute('data-theme', 'dark');
+                document.getElementById('theme-btn').innerText = '☀️ Light Mode';
+            } else {
+                document.documentElement.setAttribute('data-theme', 'light');
+                document.getElementById('theme-btn').innerText = '🌙 Dark Mode';
+            }
+        }
+
+        function toggleTheme() {
+            const currentTheme = document.documentElement.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            
+            document.documentElement.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            
+            document.getElementById('theme-btn').innerText = newTheme === 'dark' ? '☀️ Light Mode' : '🌙 Dark Mode';
+        }
+
+        // --- Screen Navigation ---
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+        }
+
+        // --- Initialization ---
+        window.addEventListener('DOMContentLoaded', () => {
+            initTheme();
+            const key = localStorage.getItem('gemini_api_key');
+            if (!key) openKeyModal();
+        });
+
+        function handleEnter(e, callback) {
+            if (e.key === 'Enter') callback();
+        }
+
+        // --- API Key Management ---
+        function openKeyModal() {
+            document.getElementById('api-key-input').value = localStorage.getItem('gemini_api_key') || '';
+            document.getElementById('key-modal').classList.remove('hidden');
+        }
+
+        function closeKeyModal() {
+            document.getElementById('key-modal').classList.add('hidden');
+        }
+
+        function saveApiKey() {
+            const key = document.getElementById('api-key-input').value.trim();
+            if (key) {
+                localStorage.setItem('gemini_api_key', key);
+                closeKeyModal();
+            } else {
+                alert('Please enter a valid API key.');
+            }
+        }
+
+        function getApiKey() {
+            return localStorage.getItem('gemini_api_key');
+        }
+
+        // --- Gemini API Caller ---
+        async function callGemini(contents, jsonMode = false) {
+            const apiKey = getApiKey();
+            if (!apiKey) {
+                openKeyModal();
+                throw new Error("Missing API Key");
+            }
+
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+            const payload = { contents: contents };
+
+            if (jsonMode) {
+                payload.generationConfig = { responseMimeType: "application/json" };
+            }
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                const errText = await response.text();
+                throw new Error(`Error ${response.status}: ${errText}`);
+            }
+
+            const data = await response.json();
+            return data.candidates[0].content.parts[0].text;
+        }
+
+        // --- Core Application Logic ---
+
+        // 1. Fetch Attractions
+        async function fetchAttractions() {
+            const destInput = document.getElementById('destination-input').value.trim();
+            if (!destInput) return;
+
+            showScreen('screen-loading-1');
+
+            const prompt = `Generate a JSON array of 9 to 12 top places to visit, attractions, or seasonal unique events for a tourist visiting "${destInput}".
+            Return strictly a JSON array containing objects matching this exact schema:
+            [
+              {"id": 1, "name": "Name", "description": "Compelling 2-sentence description.", "type": "Category"}
+            ]`;
+
+            try {
+                const responseText = await callGemini([{ parts: [{ text: prompt }] }], true);
+                attractionsData = JSON.parse(responseText);
+                
+                renderAttractionsGrid(attractionsData);
+                showScreen('screen-select');
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+                showScreen('screen-home');
+            }
+        }
+
+        function renderAttractionsGrid(items) {
+            const grid = document.getElementById('attractions-grid');
+            grid.innerHTML = '';
+
+            items.forEach(item => {
+                const card = document.createElement('div');
+                card.className = 'attraction-card';
+                card.dataset.id = item.id;
+                
+                card.innerHTML = `
+                    <div class="card-header">
+                        <h3>${item.name}</h3>
+                        <input type="checkbox" data-id="${item.id}">
+                    </div>
+                    <p>${item.description}</p>
+                    <span class="badge">${item.type}</span>
+                `;
+
+                card.addEventListener('click', (e) => {
+                    const cb = card.querySelector('input[type="checkbox"]');
+                    if (e.target !== cb) cb.checked = !cb.checked;
+                    card.classList.toggle('selected', cb.checked);
+                });
+
+                grid.appendChild(card);
+            });
+        }
+
+        // 2. Build Itinerary
+        async function buildItinerary() {
+            const checkedBoxes = document.querySelectorAll('.attractions-grid input[type="checkbox"]:checked');
+            if (checkedBoxes.length === 0) {
+                alert("Please select at least one attraction to build your itinerary!");
+                return;
+            }
+
+            showScreen('screen-loading-2');
+
+            const selectedIds = Array.from(checkedBoxes).map(cb => parseInt(cb.dataset.id));
+            selectedPlacesCache = attractionsData.filter(item => selectedIds.includes(item.id));
+
+            // Populate the Left Panel selected list
+            populateSelectedList(selectedPlacesCache);
+
+            const destName = document.getElementById('destination-input').value.trim();
+            
+            let requestText = `Build a beautifully structured, chronological daily itinerary schedule for ${destName} using ONLY the following chosen attractions:\n\n`;
+            selectedPlacesCache.forEach(p => {
+                requestText += `- ${p.name} (${p.type})\n`;
+            });
+            requestText += `\nOrganize into logical sections (e.g., Morning, Lunch, Afternoon, Evening) based on assumed geographic proximity. Include helpful context, transition tips, and suggested transport. Format with clean text and HTML headings <h3> for days or times of day. Use <strong> for emphasis. Avoid complex markdown tables.`;
+
+            conversationHistory = [{ role: 'user', parts: [{ text: requestText }] }];
+
+            try {
+                const itineraryText = await callGemini(conversationHistory, false);
+                conversationHistory.push({ role: 'model', parts: [{ text: itineraryText }] });
+                
+                displayItinerary(itineraryText);
+                showScreen('screen-final');
+            } catch (error) {
+                alert(`Error formatting itinerary: ${error.message}`);
+                showScreen('screen-select');
+            }
+        }
+
+        function populateSelectedList(places) {
+            const list = document.getElementById('selected-events-list');
+            list.innerHTML = '';
+            places.forEach(p => {
+                const item = document.createElement('div');
+                item.className = 'selected-item';
+                item.innerHTML = `<h4>${p.name}</h4><p>${p.type}</p>`;
+                list.appendChild(item);
+            });
+        }
+
+        function displayItinerary(text) {
+            const output = document.getElementById('itinerary-output');
+            
+            // Format basic markdown elements not natively handled by innerHTML
+            let htmlPayload = text
+                .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+                .replace(/### (.*)/g, '<h3>$1</h3>')
+                .replace(/## (.*)/g, '<h3>$1</h3>');
+
+            output.innerHTML = htmlPayload;
+        }
+
+        // 3. Tweak Existing Itinerary
+        async function tweakItinerary() {
+            const tweakInput = document.getElementById('tweak-input');
+            const instruction = tweakInput.value.trim();
+            if (!instruction) return;
+
+            const outputContainer = document.getElementById('itinerary-output-container');
+            outputContainer.style.opacity = '0.4';
+            outputContainer.style.pointerEvents = 'none';
+
+            conversationHistory.push({ role: 'user', parts: [{ text: instruction }] });
+            tweakInput.value = '';
+
+            try {
+                const updatedItinerary = await callGemini(conversationHistory, false);
+                conversationHistory.push({ role: 'model', parts: [{ text: updatedItinerary }] });
+                displayItinerary(updatedItinerary);
+            } catch (error) {
+                alert(`Error updating modifications: ${error.message}`);
+            } finally {
+                outputContainer.style.opacity = '1';
+                outputContainer.style.pointerEvents = 'auto';
+            }
+        }
+    </script>
+</body>
+</html>

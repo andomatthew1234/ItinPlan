@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How to add an API key - ItinPlan</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+    <a href="../index.html" class="back-btn">← Back to ItinPlan</a>
+
+    <div class="wizard-container">
+        <div class="progress-dots">
+            <span class="dot active" onclick="goToSlide(0)"></span>
+            <span class="dot" onclick="goToSlide(1)"></span>
+            <span class="dot" onclick="goToSlide(2)"></span>
+            <span class="dot" onclick="goToSlide(3)"></span>
+        </div>
+
+        <div class="slides-wrapper">
+            
+            <div class="slide active">
+                <div class="slide-content">
+                    <div class="icon-header">🌐</div>
+                    <h2>Go to the Google API Studio site</h2>
+                    <p>Press the button below to go to the site.</p>
+                    <a href="https://aistudio.google.com/api-keys" target="_blank" class="btn btn-warning" style="margin-bottom: 2rem;">Open Google API Studio ➔</a>
+                    
+                    <div class="divider"></div>
+
+                    <div class="icon-header">➕</div>
+                    <h2>Add an API key</h2>
+                    <p>First, press the <strong>Create new API key</strong> button.</p>
+                    <img src="api/1.png" alt="Create new API key button" class="screenshot">
+                </div>
+            </div>
+
+            <div class="slide">
+                <div class="slide-content">
+                    <div class="icon-header">➕</div>
+                    <h2>Finish creating your API key</h2>
+                    <p>Give your API key a name. Then, create a new Project for your API key (it can be anything you like!)</p>
+                    <img src="api/2.png" alt="Name your API key and project" class="screenshot">
+                </div>
+            </div>
+
+            <div class="slide">
+                <div class="slide-content">
+                    <div class="icon-header">💭</div>
+                    <h2>Copy your API key</h2>
+                    <p>Select 'Create API key', and then select the copy icon to copy it to your clipboard.</p>
+                    <img src="api/3.png" alt="Create API key button" class="screenshot">
+                    <img src="api/4.png" alt="Copy icon" class="screenshot">
+                </div>
+            </div>
+
+            <div class="slide">
+                <div class="slide-content">
+                    <div class="icon-header">📋</div>
+                    <h2>Enter your API key</h2>
+                    <p>On the next page, paste your API key into ItinPlan to get started!</p>
+                    <img src="api/5.png" alt="Paste API key screen" class="screenshot">
+                    
+                    <a href="../index.html?openConfig=true" class="btn btn-success" style="margin-top: 2rem; font-size: 1.1rem; padding: 1rem 2rem;">Let's enter your API Key! 🎉</a>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="wizard-controls">
+            <button class="btn btn-secondary" id="prev-btn" onclick="changeSlide(-1)" disabled>Back</button>
+            <button class="btn btn-primary" id="next-btn" onclick="changeSlide(1)">Next Step</button>
+        </div>
+    </div>
+
+    <script>
+        let currentSlide = 0;
+        const slides = document.querySelectorAll('.slide');
+        const dots = document.querySelectorAll('.dot');
+        const prevBtn = document.getElementById('prev-btn');
+        const nextBtn = document.getElementById('next-btn');
+
+        function updateWizard() {
+            // Hide all slides
+            slides.forEach(slide => slide.classList.remove('active'));
+            dots.forEach(dot => dot.classList.remove('active'));
+
+            // Show current slide
+            slides[currentSlide].classList.add('active');
+            dots[currentSlide].classList.add('active');
+
+            // Update button states
+            prevBtn.disabled = currentSlide === 0;
+            
+            if (currentSlide === slides.length - 1) {
+                nextBtn.style.display = 'none'; // Hide next button on last slide
+            } else {
+                nextBtn.style.display = 'block';
+                nextBtn.innerText = 'Next Step';
+            }
+        }
+
+        function changeSlide(direction) {
+            currentSlide += direction;
+            if (currentSlide < 0) currentSlide = 0;
+            if (currentSlide >= slides.length) currentSlide = slides.length - 1;
+            updateWizard();
+        }
+
+        function goToSlide(index) {
+            currentSlide = index;
+            updateWizard();
+        }
+    </script>
+</body>
+</html>

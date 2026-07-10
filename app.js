@@ -37,10 +37,10 @@ function toggleTheme() {
 // --- Model Sync & Trial Mode ---
 function initModel() {
     if (localStorage.getItem('trial_mode') === 'true') {
-        updateGlobalModel('gemini-2.5-flash-lite');
+        updateGlobalModel('gemini-3.1-flash-lite');
         document.querySelectorAll('.model-selector').forEach(s => s.disabled = true);
     } else {
-        const defaultModel = localStorage.getItem('default_gemini_model') || 'gemini-2.5-flash';
+        const defaultModel = localStorage.getItem('default_gemini_model') || 'gemini-3.5-flash';
         updateGlobalModel(defaultModel);
         document.querySelectorAll('.model-selector').forEach(s => s.disabled = false);
     }
@@ -52,11 +52,11 @@ function updateGlobalModel(modelName) {
     document.getElementById('select-model-select').value = modelName;
 }
 
-function getActiveModel() { return localStorage.getItem('default_gemini_model') || 'gemini-2.5-flash'; }
+function getActiveModel() { return localStorage.getItem('default_gemini_model') || 'gemini-3.5-flash'; }
 
 function activateTrialMode() {
     localStorage.setItem('trial_mode', 'true');
-    initModel(); // Locks the model selectors to Lite
+    initModel(); 
     closeModal('key-modal');
     alert("Trial mode activated! You can generate one free itinerary.");
 }
@@ -100,12 +100,11 @@ function saveApiKey() {
     if (key) { 
         localStorage.setItem('gemini_api_key', key); 
         localStorage.removeItem('trial_mode'); 
-        initModel(); // Unlocks model selectors
+        initModel(); 
         closeModal('key-modal'); 
     }
 }
 
-// Fetches either the user's local key or the hidden trial key from /api/api.txt
 async function getApiKey() {
     if (localStorage.getItem('trial_mode') === 'true') {
         try {
@@ -134,7 +133,7 @@ function parseGeminiJSON(text) {
     }
 }
 
-// --- API Caller & Error Interceptor ---
+// --- API Caller & Error Interceptor (with 10-second polling logic) ---
 async function callGemini(contents, jsonMode = false) {
     const apiKey = await getApiKey();
     if (!apiKey) throw new Error("Missing API Key");
@@ -144,39 +143,53 @@ async function callGemini(contents, jsonMode = false) {
     const payload = { contents: contents };
     if (jsonMode) { payload.generationConfig = { responseMimeType: "application/json" }; }
 
-    const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-    });
+    const startTime = Date.now();
+    const timeoutDuration = 10000; // 10 seconds total wait allowance
 
-    if (!response.ok) {
-        const errText = await response.text();
-        let parsedError;
-        try { parsedError = JSON.parse(errText); } catch(e){}
-        
-        if (response.status === 503 || (parsedError && parsedError.error && parsedError.error.code === 503)) {
-            throw { status: 503, message: "High demand throttling hook" };
+    // Polling loop to gracefully handle temporary 503 drops
+    while (true) {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+            const errText = await response.text();
+            let parsedError;
+            try { parsedError = JSON.parse(errText); } catch(e){}
+            
+            const is503 = response.status === 503 || (parsedError && parsedError.error && parsedError.error.code === 503);
+            
+            if (is503) {
+                // If we haven't waited 10 seconds yet, pause for 1.5s and retry automatically
+                if (Date.now() - startTime < timeoutDuration) {
+                    await new Promise(resolve => setTimeout(resolve, 1500));
+                    continue; 
+                } else {
+                    throw { status: 503, message: "High demand throttling hook" };
+                }
+            }
+            
+            if (response.status === 429 || (parsedError && parsedError.error && parsedError.error.code === 429)) {
+                throw { status: 429, message: "Quota Exhausted hook" };
+            }
+
+            throw new Error(`Error ${response.status}: ${errText}`);
         }
         
-        if (response.status === 429 || (parsedError && parsedError.error && parsedError.error.code === 429)) {
-            throw { status: 429, message: "Quota Exhausted hook" };
-        }
-
-        throw new Error(`Error ${response.status}: ${errText}`);
+        const data = await response.json();
+        return data.candidates[0].content.parts[0].text;
     }
-    const data = await response.json();
-    return data.candidates[0].content.parts[0].text;
 }
 
 // --- Recovery Actions ---
 function retryFailedAction() { if (lastFailedFunction) lastFailedFunction(); }
-function retryWithLighterModel() { updateGlobalModel('gemini-2.5-flash-lite'); if (lastFailedFunction) lastFailedFunction(); }
+function retryWithLighterModel() { updateGlobalModel('gemini-3.1-flash-lite'); if (lastFailedFunction) lastFailedFunction(); }
 function cancelError() { closeModal('place-details-modal'); showScreen('screen-home'); }
 
 // --- Phase 1: Fetch Attractions ---
 async function fetchAttractions() {
-    // Prevent users from starting a second trip if they are on trial mode
     if (localStorage.getItem('trial_mode') === 'true' && localStorage.getItem('trial_trip_completed') === 'true') {
         alert("You have completed your free trial trip! To plan another destination, please enter your own API key.");
         openKeyModal();
@@ -257,7 +270,6 @@ async function buildItinerary() {
         
         currentTripState.tabsData = parseGeminiJSON(responseText);
         
-        // Mark trial as consumed once they get their first itinerary
         if (localStorage.getItem('trial_mode') === 'true') {
             localStorage.setItem('trial_trip_completed', 'true');
         }
@@ -267,7 +279,7 @@ async function buildItinerary() {
     } catch (error) {
         if (error.status === 503) showScreen('screen-error-demand');
         else if (error.status === 429) showScreen('screen-error-limit');
-        else { alert(`Error: ${error.message}`); showScreen('screen-select'); }
+        else { console.error(error); showScreen('screen-not-found'); }
     }
 }
 
@@ -338,7 +350,7 @@ async function tweakItinerary() {
     } catch (error) {
         if (error.status === 503) { conversationHistory.pop(); tweakInput.value = instruction; showScreen('screen-error-demand'); } 
         else if (error.status === 429) { conversationHistory.pop(); tweakInput.value = instruction; showScreen('screen-error-limit'); }
-        else { alert(`Error: ${error.message}`); conversationHistory.pop(); }
+        else { console.error(error); showScreen('screen-not-found'); conversationHistory.pop(); }
     } finally {
         tabContainer.style.opacity = '1'; tabContainer.style.pointerEvents = 'auto'; loadingBar.style.display = 'none';
     }
@@ -461,7 +473,7 @@ async function regenerateFromDragDrop() {
     } catch (error) {
         if (error.status === 503) { conversationHistory.pop(); showScreen('screen-error-demand'); } 
         else if (error.status === 429) { conversationHistory.pop(); showScreen('screen-error-limit'); }
-        else { alert(`Error updating schedule: ${error.message}`); conversationHistory.pop(); }
+        else { console.error(error); showScreen('screen-not-found'); conversationHistory.pop(); }
     } finally {
         tabContainer.style.opacity = '1';
         dndBtn.innerText = "🔁 Regenerate itinerary with tweaks";
@@ -512,6 +524,6 @@ async function generatePlaceDetails(placeName) {
     } catch (error) {
         if (error.status === 503) { closeModal('place-details-modal'); showScreen('screen-error-demand'); }
         else if (error.status === 429) { closeModal('place-details-modal'); showScreen('screen-error-limit'); }
-        else { modalContent.innerHTML = `<p style="color:var(--error-text);">Failed to load details. ${error.message}</p>`; }
+        else { modalContent.innerHTML = `<p style="color:var(--error-text);">Failed to load details. Ensure it is a valid attraction.</p>`; }
     }
 }

@@ -37,10 +37,10 @@ function toggleTheme() {
 // --- Model Sync & Trial Mode ---
 function initModel() {
     if (localStorage.getItem('trial_mode') === 'true') {
-        updateGlobalModel('gemini-2.5-flash-lite');
+        updateGlobalModel('gemini-3.1-flash-lite');
         document.querySelectorAll('.model-selector').forEach(s => s.disabled = true);
     } else {
-        const defaultModel = localStorage.getItem('default_gemini_model') || 'gemini-2.5-flash';
+        const defaultModel = localStorage.getItem('default_gemini_model') || 'gemini-3.5-flash';
         updateGlobalModel(defaultModel);
         document.querySelectorAll('.model-selector').forEach(s => s.disabled = false);
     }
@@ -52,7 +52,7 @@ function updateGlobalModel(modelName) {
     document.getElementById('select-model-select').value = modelName;
 }
 
-function getActiveModel() { return localStorage.getItem('default_gemini_model') || 'gemini-2.5-flash'; }
+function getActiveModel() { return localStorage.getItem('default_gemini_model') || 'gemini-3.5-flash'; }
 
 function activateTrialMode() {
     localStorage.setItem('trial_mode', 'true');
@@ -171,7 +171,7 @@ async function callGemini(contents, jsonMode = false) {
 
 // --- Recovery Actions ---
 function retryFailedAction() { if (lastFailedFunction) lastFailedFunction(); }
-function retryWithLighterModel() { updateGlobalModel('gemini-2.5-flash-lite'); if (lastFailedFunction) lastFailedFunction(); }
+function retryWithLighterModel() { updateGlobalModel('gemini-3.1-flash-lite'); if (lastFailedFunction) lastFailedFunction(); }
 function cancelError() { closeModal('place-details-modal'); showScreen('screen-home'); }
 
 // --- Phase 1: Fetch Attractions ---
